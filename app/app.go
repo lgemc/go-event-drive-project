@@ -28,6 +28,19 @@ func NewApp(ctx context.Context) *App {
 	}
 }
 
+func (a *App) InitMock() error {
+	dependencies := &Dependencies{}
+
+	err := dependencies.BuildMock()
+	if err != nil {
+		return err
+	}
+
+	a.Dependencies = dependencies
+
+	return nil
+}
+
 func (a *App) Init() error {
 	dependencies := &Dependencies{}
 

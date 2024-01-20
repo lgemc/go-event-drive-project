@@ -15,8 +15,14 @@ import (
 )
 
 type Dependencies struct {
-	Router *message.Router
-	Server *echo.Echo
+	ReceiptsClient ReceiptsClientInterface
+	Router         *message.Router
+	Server         *echo.Echo
+}
+
+type BuildInput struct {
+	ReceiptsClient ReceiptsClientInterface
+	Clients        *clients.Clients
 }
 
 func (d *Dependencies) Build() error {
@@ -32,6 +38,37 @@ func (d *Dependencies) Build() error {
 	}
 
 	receiptsClient := NewReceiptsClient(clients)
+
+	return d.build(BuildInput{
+		Clients:        clients,
+		ReceiptsClient: receiptsClient,
+	})
+}
+
+func (d *Dependencies) BuildMock() error {
+	clients, err := clients.NewClients(
+		os.Getenv("GATEWAY_ADDR"),
+		func(ctx context.Context, req *http.Request) error {
+			req.Header.Set("Correlation-ID", log.CorrelationIDFromContext(ctx))
+
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+
+	receiptsClient := ReceiptsServiceMock{}
+
+	return d.build(BuildInput{
+		Clients:        clients,
+		ReceiptsClient: &receiptsClient,
+	})
+}
+
+func (d *Dependencies) build(input BuildInput) error {
+	clients := input.Clients
+	receiptsClient := input.ReceiptsClient
+
 	spreadsheetsClient := NewSpreadsheetsClient(clients)
 
 	watermillLogger := log.NewWatermill(logrus.NewEntry(logrus.StandardLogger()))
@@ -90,6 +127,7 @@ func (d *Dependencies) Build() error {
 
 	d.Router = router
 	d.Server = server
+	d.ReceiptsClient = receiptsClient
 
 	return nil
 }

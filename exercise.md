@@ -1,27 +1,13 @@
-# Time for Refactoring!
-
-During development, we might not always have the necessary time to implement everything in the most optimal way. 
-Sometimes, we may find that our initial assumptions don't hold true.
-
-As our project continues to grow, the right moment may come for some refactoring. 
-This will help maintain the code's simplicity and manageability for future exercises.
+# Testing ticket cancellation
 
 ## Exercise
 
 File: `project/main.go`
 
-In this module, we will focus on component testing.
-It may be worthwhile to refactor the code in a way that it will be easier to test and extend in the future.
-Did you cut corners somewhere? Can you improve the code in some way?
-It's a good time to pause for a moment and think about this. 
-It's often good to do this in a real project after achieving a milestone — there is always some technical debt we can repay.
+Based on the previous steps, write tests for ticket cancellation.
 
-In this module, we're not introducing any new functionality. 
-If there are areas in the code, you feel could benefit from improvement, go ahead and enhance them. 
-However, if you believe your code is already perfect, feel free to submit the solution without making any changes. 
-
-On our side, we introduced a few packages so it's easier to understand what's going on.
-If you're looking for inspiration, you can return to this exercise and check the solution.
+1. Call `http://localhost:8080/tickets-status` with `status` set to `canceled`.
+2. Assert that the ticket was added to  the `tickets-to-refund` sheet.
 
 
 <div class="alert alert-dismissible bg-light-primary d-flex flex-column flex-sm-row p-7 mb-10">
@@ -33,17 +19,9 @@ If you're looking for inspiration, you can return to this exercise and check the
 			Tip
 		</h3>
         <span>
-
-There is no perfect way of organizing code.
-
-You don't need to follow exactly the same layout as we do in the example solution.
-We used a format that would be easy to understand by anyone.
-**You don't need to replicate this layout in your project. Use what works best for you.**
-
-Usually, we would use the Clean Architecture approach.
-This is out of the scope of this training, as we want to keep it easy to understand for everyone.
-If you want to experiment with Clean Architecture, please check our ["Introducing Clean Architecture" article](https://threedots.tech/post/introducing-clean-architecture/).
-
+When you are adding tests to existing functionality, it's good to use the test sabotage technique — write the test
+and then break the code to see if the test fails. This approach has saved us many times from having tests that were not testing anything.
 </span>
 	</div>
 	</div>
+

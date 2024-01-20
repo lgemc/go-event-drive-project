@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"github.com/ThreeDotsLabs/watermill"
 )
 
 type IssueReceiptResponse struct {
@@ -23,15 +21,12 @@ type ReceiptsServiceMock struct {
 	receiptLock sync.Mutex
 }
 
-func (mock *ReceiptsServiceMock) IssueReceipt(ctx context.Context, request Ticket) (IssueReceiptResponse, error) {
+func (mock *ReceiptsServiceMock) IssueReceipt(ctx context.Context, request Ticket) error {
 	defer mock.receiptLock.Unlock()
 
 	mock.receiptLock.Lock()
 
 	mock.IssuedReceipts = append(mock.IssuedReceipts, request)
 
-	return IssueReceiptResponse{
-		ReceiptNumber: watermill.NewUUID(),
-		IssuedAt:      time.Now(),
-	}, nil
+	return nil
 }
