@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ type InjectHandlersInput struct {
 	Router             *message.Router
 	IssuesReceiptSub   *redisstream.Subscriber
 	AppendToTrackerSub *redisstream.Subscriber
-	ReceiptsClient     *ReceiptsClient
+	ReceiptsClient     ReceiptsClientInterface
 	SpreadsheetsClient *SpreadsheetsClient
 }
 

@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -9,11 +9,15 @@ import (
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients/receipts"
 )
 
+type ReceiptsClientInterface interface {
+	IssueReceipt(ctx context.Context, ticket Ticket) error
+}
+
 type ReceiptsClient struct {
 	clients *clients.Clients
 }
 
-func NewReceiptsClient(clients *clients.Clients) ReceiptsClient {
+func NewReceiptsClient(clients *clients.Clients) ReceiptsClientInterface {
 	return ReceiptsClient{
 		clients: clients,
 	}

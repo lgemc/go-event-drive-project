@@ -1,4 +1,4 @@
-package main
+package app
 
 type EventHeader struct {
 	ID          string `json:"id"`

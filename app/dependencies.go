@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -20,7 +20,6 @@ type Dependencies struct {
 }
 
 func (d *Dependencies) Build() error {
-
 	clients, err := clients.NewClients(
 		os.Getenv("GATEWAY_ADDR"),
 		func(ctx context.Context, req *http.Request) error {
@@ -85,7 +84,7 @@ func (d *Dependencies) Build() error {
 		Router:             router,
 		IssuesReceiptSub:   issueReceiptSub,
 		AppendToTrackerSub: appendToTrackerSub,
-		ReceiptsClient:     &receiptsClient,
+		ReceiptsClient:     receiptsClient,
 		SpreadsheetsClient: &spreadsheetsClient,
 	})
 
