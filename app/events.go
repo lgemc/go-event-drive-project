@@ -9,3 +9,11 @@ type TicketEvent struct {
 	*Ticket
 	Header EventHeader `json:"header"`
 }
+
+type TicketBookingConfirmed struct {
+	*TicketEvent
+}
+
+type TicketCanceledEvent struct {
+	*TicketEvent
+}

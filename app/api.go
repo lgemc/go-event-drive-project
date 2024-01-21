@@ -1,15 +1,14 @@
 package app
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
+	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"net/http"
 	"time"
 
 	commonHTTP "github.com/ThreeDotsLabs/go-event-driven/common/http"
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
-	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/labstack/echo/v4"
 )
 
@@ -17,7 +16,7 @@ type TicketsRequest struct {
 	Tickets []Ticket `json:"tickets"`
 }
 
-func handleTicket(ticket Ticket, pub message.Publisher, correlationId string) error {
+func handleTicket(ctx context.Context, ticket Ticket, bus *cqrs.EventBus) error {
 	event := TicketEvent{
 		Ticket: &ticket,
 		Header: EventHeader{
@@ -26,36 +25,29 @@ func handleTicket(ticket Ticket, pub message.Publisher, correlationId string) er
 		},
 	}
 
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-
-	msg := message.NewMessage(watermill.NewUUID(), payload)
-	msg.Metadata.Set("correlation_id", correlationId)
-
 	switch ticket.Status {
 	case TicketStatusConfirmed:
-		msg.Metadata.Set("type", TicketBookingConfirmedTopic.String())
-		err := pub.Publish(TicketBookingConfirmedTopic.String(), msg)
-		if err != nil {
-			return err
-		}
+		return bus.Publish(ctx, TicketBookingConfirmed{
+			TicketEvent: &TicketEvent{
+				Ticket: event.Ticket,
+				Header: event.Header,
+			},
+		})
 	case TicketStatusCanceled:
-		msg.Metadata.Set("type", TicketBookingCanceledTopic.String())
-		err := pub.Publish(TicketBookingCanceledTopic.String(), msg)
-		if err != nil {
-			return err
-		}
+		return bus.Publish(ctx, TicketCanceledEvent{
+			TicketEvent: &TicketEvent{
+				Ticket: event.Ticket,
+				Header: event.Header,
+			},
+		})
 	default:
 		return errors.New("unknown ticket status")
 	}
-
-	return nil
 }
 
 type NewServerInput struct {
-	Pub *redisstream.Publisher
+	EventBus *cqrs.EventBus
+	Logger   watermill.LoggerAdapter
 }
 
 func NewServer(input NewServerInput) *echo.Echo {
@@ -78,7 +70,7 @@ func NewServer(input NewServerInput) *echo.Echo {
 		}
 
 		for _, ticket := range request.Tickets {
-			err := handleTicket(ticket, input.Pub, correlationId)
+			err := handleTicket(context.Background(), ticket, input.EventBus)
 			if err != nil {
 				return c.String(http.StatusBadRequest, err.Error())
 			}

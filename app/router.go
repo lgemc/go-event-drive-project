@@ -40,7 +40,7 @@ func InjectMiddlewares(input InjectMiddlewaresInput) {
 	router.AddMiddleware(retry.Middleware)
 
 	// skip messages without type because we don't want to handle them
-	router.AddMiddleware(skipMessagesWithEmptyType)
+	// router.AddMiddleware(skipMessagesWithEmptyType)
 
 	router.AddMiddleware(fixCurrency)
 }

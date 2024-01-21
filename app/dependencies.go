@@ -77,26 +77,17 @@ func (d *Dependencies) build(input BuildInput) error {
 		return err
 	}
 
-	bus, err := cqrs.NewEventBusWithConfig()
-
-	issueReceiptSub, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
-		Client:        rdb,
-		ConsumerGroup: "issue-receipt",
-	}, watermillLogger)
-	if err != nil {
-		return err
-	}
-
-	appendToTrackerSub, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
-		Client:        rdb,
-		ConsumerGroup: "append-to-tracker",
-	}, watermillLogger)
-	if err != nil {
-		return err
-	}
+	bus, err := cqrs.NewEventBusWithConfig(pub, cqrs.EventBusConfig{
+		Marshaler: cqrs.JSONMarshaler{GenerateName: cqrs.StructName},
+		GeneratePublishTopic: func(params cqrs.GenerateEventPublishTopicParams) (string, error) {
+			return params.EventName, nil
+		},
+		Logger: watermillLogger,
+	})
 
 	server := NewServer(NewServerInput{
-		Pub: pub,
+		EventBus: bus,
+		Logger:   watermillLogger,
 	})
 
 	router, err := NewRouter(NewRouterInput{
@@ -112,13 +103,52 @@ func (d *Dependencies) build(input BuildInput) error {
 		Logger: watermillLogger,
 	})
 
-	InjectHandlers(InjectHandlersInput{
-		Router:             router,
-		IssuesReceiptSub:   issueReceiptSub,
-		AppendToTrackerSub: appendToTrackerSub,
-		ReceiptsClient:     receiptsClient,
-		SpreadsheetsClient: spreadsheetsClient,
+	ep, err := cqrs.NewEventProcessorWithConfig(router, cqrs.EventProcessorConfig{
+		SubscriberConstructor: func(params cqrs.EventProcessorSubscriberConstructorParams) (message.Subscriber, error) {
+			return redisstream.NewSubscriber(redisstream.SubscriberConfig{
+				Client:        rdb,
+				ConsumerGroup: "svc-tickets." + params.HandlerName,
+			}, watermillLogger)
+		},
+		Marshaler: cqrs.JSONMarshaler{
+			GenerateName: cqrs.StructName,
+		},
+		GenerateSubscribeTopic: func(params cqrs.EventProcessorGenerateSubscribeTopicParams) (string, error) {
+			return params.EventName, nil
+		},
+		Logger: watermillLogger,
 	})
+	if err != nil {
+		return err
+	}
+
+	issuesReceipt := cqrs.NewEventHandler[TicketBookingConfirmed]("issues-receipt", func(ctx context.Context, event *TicketBookingConfirmed) error {
+		return receiptsClient.IssueReceipt(ctx, *event.Ticket)
+	})
+
+	printTicket := cqrs.NewEventHandler[TicketBookingConfirmed]("print-ticket", func(ctx context.Context, event *TicketBookingConfirmed) error {
+		ticket := event.Ticket
+
+		return spreadsheetsClient.AppendRow(ctx, "tickets-to-print", []string{
+			ticket.TicketID,
+			ticket.CustomerEmail,
+			ticket.Price.Amount,
+			ticket.Price.Currency,
+		})
+	})
+
+	appendCanceledTicket := cqrs.NewEventHandler[TicketCanceledEvent]("append-canceled", func(ctx context.Context, event *TicketCanceledEvent) error {
+		ticket := event.Ticket
+
+		return spreadsheetsClient.AppendRow(ctx, "tickets-to-refund", []string{
+			ticket.TicketID,
+			ticket.CustomerEmail,
+			ticket.Price.Amount,
+			ticket.Price.Currency,
+		})
+	})
+
+	err = ep.AddHandlers(issuesReceipt, printTicket, appendCanceledTicket)
 
 	d.Router = router
 	d.Server = server
