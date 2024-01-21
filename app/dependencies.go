@@ -6,7 +6,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"net/http"
 	"os"
-	"strconv"
 	"tickets/app/api"
 	"tickets/app/repositories"
 
@@ -23,6 +22,7 @@ type Dependencies struct {
 	ReceiptsClient     ReceiptsClientInterface
 	SpreadsheetsClient SpreadsheetsClientInterface
 	Router             *message.Router
+	EventProcessor     *cqrs.EventProcessor
 	Server             *echo.Echo
 	db                 *sqlx.DB
 }
@@ -143,62 +143,21 @@ func (d *Dependencies) build(input BuildInput) error {
 		return err
 	}
 
-	issuesReceipt := cqrs.NewEventHandler[TicketBookingConfirmed]("issues-receipt", func(ctx context.Context, event *TicketBookingConfirmed) error {
-		return receiptsClient.IssueReceipt(ctx, *event.Ticket)
-	})
-
-	storeConfirmed := cqrs.NewEventHandler[TicketBookingConfirmed]("store-confirmed", func(ctx context.Context, event *TicketBookingConfirmed) error {
-		priceAmount, err := strconv.ParseFloat(event.Price.Amount, 64)
-		if err != nil {
-			return err
-		}
-
-		return ticketsRepo.Put(ctx, repositories.Ticket{
-			TicketID:      event.TicketID,
-			PriceAmount:   priceAmount,
-			PriceCurrency: event.Price.Currency,
-			CustomerEmail: event.CustomerEmail,
-		})
-	})
-
-	deleteCanceled := cqrs.NewEventHandler[TicketCanceledEvent]("remove-canceled", func(ctx context.Context, event *TicketCanceledEvent) error {
-		return ticketsRepo.Delete(ctx, event.TicketID)
-	})
-
-	printTicket := cqrs.NewEventHandler[TicketBookingConfirmed]("print-ticket", func(ctx context.Context, event *TicketBookingConfirmed) error {
-		ticket := event.Ticket
-
-		return spreadsheetsClient.AppendRow(ctx, "tickets-to-print", []string{
-			ticket.TicketID,
-			ticket.CustomerEmail,
-			ticket.Price.Amount,
-			ticket.Price.Currency,
-		})
-	})
-
-	appendCanceledTicket := cqrs.NewEventHandler[TicketCanceledEvent]("append-canceled", func(ctx context.Context, event *TicketCanceledEvent) error {
-		ticket := event.Ticket
-
-		return spreadsheetsClient.AppendRow(ctx, "tickets-to-refund", []string{
-			ticket.TicketID,
-			ticket.CustomerEmail,
-			ticket.Price.Amount,
-			ticket.Price.Currency,
-		})
-	})
-
-	err = ep.AddHandlers(
-		storeConfirmed,
-		issuesReceipt,
-		printTicket,
-		appendCanceledTicket,
-		deleteCanceled,
-	)
+	err = injectHandlers(injectHandlersInput{
+		receiptsClient:     receiptsClient,
+		ticketsRepo:        ticketsRepo,
+		spreadsheetsClient: spreadsheetsClient,
+	}, ep)
+	if err != nil {
+		return err
+	}
 
 	d.Router = router
 	d.Server = server
 	d.ReceiptsClient = receiptsClient
 	d.SpreadsheetsClient = spreadsheetsClient
+	d.db = db
+	d.EventProcessor = ep
 
 	return nil
 }
