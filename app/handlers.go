@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"github.com/ThreeDotsLabs/go-event-driven/common/clients/files"
 	"strconv"
 
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
@@ -12,6 +14,7 @@ type injectHandlersInput struct {
 	receiptsClient     ReceiptsClientInterface
 	ticketsRepo        repositories.TicketsRepository
 	spreadsheetsClient SpreadsheetsClientInterface
+	filesClient        files.ClientWithResponsesInterface
 }
 
 func injectHandlers(input injectHandlersInput, ep *cqrs.EventProcessor) error {
@@ -63,11 +66,20 @@ func injectHandlers(input injectHandlersInput, ep *cqrs.EventProcessor) error {
 		})
 	})
 
+	createConfirmationFile := cqrs.NewEventHandler[TicketBookingConfirmed]("create-confirmation-file", func(ctx context.Context, event *TicketBookingConfirmed) error {
+		_, err := input.filesClient.PutFilesFileIdContentWithTextBodyWithResponse(
+			ctx,
+			fmt.Sprintf("%s-ticket.html", event.TicketID), "hi")
+
+		return err
+	})
+
 	return ep.AddHandlers(
 		storeConfirmed,
 		issuesReceipt,
 		printTicket,
 		appendCanceledTicket,
 		deleteCanceled,
+		createConfirmationFile,
 	)
 }

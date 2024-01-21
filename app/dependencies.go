@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com/ThreeDotsLabs/go-event-driven/common/clients/files"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"github.com/jmoiron/sqlx"
 	"net/http"
@@ -30,6 +31,7 @@ type Dependencies struct {
 type BuildInput struct {
 	ReceiptsClient     ReceiptsClientInterface
 	SpreadsheetsClient SpreadsheetsClientInterface
+	FilesClient        files.ClientWithResponsesInterface
 }
 
 func (d *Dependencies) Build() error {
@@ -50,6 +52,7 @@ func (d *Dependencies) Build() error {
 	err = d.build(BuildInput{
 		ReceiptsClient:     receiptsClient,
 		SpreadsheetsClient: spreadsheetsClient,
+		FilesClient:        clients.Files,
 	})
 	if err != nil {
 		return err
@@ -147,6 +150,7 @@ func (d *Dependencies) build(input BuildInput) error {
 		receiptsClient:     receiptsClient,
 		ticketsRepo:        ticketsRepo,
 		spreadsheetsClient: spreadsheetsClient,
+		filesClient:        input.FilesClient,
 	}, ep)
 	if err != nil {
 		return err
