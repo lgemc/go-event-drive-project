@@ -63,6 +63,7 @@ func (a *App) Run() {
 
 	router := a.Dependencies.Router
 	server := a.Dependencies.Server
+	db := a.Dependencies.db
 
 	errgrp.Go(func() error {
 		// we don't want to start HTTP server before Watermill router (so service won't be healthy before it's ready)
@@ -86,6 +87,12 @@ func (a *App) Run() {
 		<-ctx.Done()
 
 		return router.Close()
+	})
+
+	errgrp.Go(func() error {
+		<-ctx.Done()
+
+		return db.Close()
 	})
 
 	errgrp.Go(func() error {

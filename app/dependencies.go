@@ -3,8 +3,11 @@ package app
 import (
 	"context"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
+	"github.com/jmoiron/sqlx"
 	"net/http"
 	"os"
+	"strconv"
+	"tickets/app/repositories"
 
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients"
 	"github.com/ThreeDotsLabs/go-event-driven/common/log"
@@ -20,6 +23,7 @@ type Dependencies struct {
 	SpreadsheetsClient SpreadsheetsClientInterface
 	Router             *message.Router
 	Server             *echo.Echo
+	db                 *sqlx.DB
 }
 
 type BuildInput struct {
@@ -28,6 +32,11 @@ type BuildInput struct {
 }
 
 func (d *Dependencies) Build() error {
+	err := migrate()
+	if err != nil {
+		return err
+	}
+
 	clients, err := clients.NewClients(
 		os.Getenv("GATEWAY_ADDR"),
 		func(ctx context.Context, req *http.Request) error {
@@ -61,6 +70,13 @@ func (d *Dependencies) BuildMock() error {
 }
 
 func (d *Dependencies) build(input BuildInput) error {
+	db, err := sqlx.Open("postgres", os.Getenv("POSTGRES_URL"))
+	if err != nil {
+		return err
+	}
+
+	ticketsRepo := repositories.NewTicketsRepository(db)
+
 	receiptsClient := input.ReceiptsClient
 	spreadsheetsClient := input.SpreadsheetsClient
 
@@ -126,6 +142,20 @@ func (d *Dependencies) build(input BuildInput) error {
 		return receiptsClient.IssueReceipt(ctx, *event.Ticket)
 	})
 
+	storeConfirmed := cqrs.NewEventHandler[TicketBookingConfirmed]("store-confirmed", func(ctx context.Context, event *TicketBookingConfirmed) error {
+		priceAmount, err := strconv.ParseFloat(event.Price.Amount, 64)
+		if err != nil {
+			return err
+		}
+
+		return ticketsRepo.Put(ctx, repositories.Ticket{
+			TicketID:      event.TicketID,
+			PriceAmount:   priceAmount,
+			PriceCurrency: event.Price.Currency,
+			CustomerEmail: event.CustomerEmail,
+		})
+	})
+
 	printTicket := cqrs.NewEventHandler[TicketBookingConfirmed]("print-ticket", func(ctx context.Context, event *TicketBookingConfirmed) error {
 		ticket := event.Ticket
 
@@ -148,7 +178,12 @@ func (d *Dependencies) build(input BuildInput) error {
 		})
 	})
 
-	err = ep.AddHandlers(issuesReceipt, printTicket, appendCanceledTicket)
+	err = ep.AddHandlers(
+		storeConfirmed,
+		issuesReceipt,
+		printTicket,
+		appendCanceledTicket,
+	)
 
 	d.Router = router
 	d.Server = server
