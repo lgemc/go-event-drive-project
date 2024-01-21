@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"tickets/app/api"
 	"tickets/app/repositories"
 
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients"
@@ -32,11 +33,6 @@ type BuildInput struct {
 }
 
 func (d *Dependencies) Build() error {
-	err := migrate()
-	if err != nil {
-		return err
-	}
-
 	clients, err := clients.NewClients(
 		os.Getenv("GATEWAY_ADDR"),
 		func(ctx context.Context, req *http.Request) error {
@@ -51,10 +47,15 @@ func (d *Dependencies) Build() error {
 	receiptsClient := NewReceiptsClient(clients)
 	spreadsheetsClient := NewSpreadsheetsClient(clients)
 
-	return d.build(BuildInput{
+	err = d.build(BuildInput{
 		ReceiptsClient:     receiptsClient,
 		SpreadsheetsClient: spreadsheetsClient,
 	})
+	if err != nil {
+		return err
+	}
+
+	return Migrate(d.db)
 }
 
 func (d *Dependencies) BuildMock() error {
@@ -76,6 +77,9 @@ func (d *Dependencies) build(input BuildInput) error {
 	}
 
 	ticketsRepo := repositories.NewTicketsRepository(db)
+	ticketsService := api.NewTicketsService(api.NewTicketsServiceInput{
+		TicketRepository: ticketsRepo,
+	})
 
 	receiptsClient := input.ReceiptsClient
 	spreadsheetsClient := input.SpreadsheetsClient
@@ -102,8 +106,9 @@ func (d *Dependencies) build(input BuildInput) error {
 	})
 
 	server := NewServer(NewServerInput{
-		EventBus: bus,
-		Logger:   watermillLogger,
+		EventBus:       bus,
+		Logger:         watermillLogger,
+		TicketsService: ticketsService,
 	})
 
 	router, err := NewRouter(NewRouterInput{

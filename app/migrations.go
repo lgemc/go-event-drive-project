@@ -1,8 +1,6 @@
 package app
 
 import (
-	"os"
-
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -16,14 +14,8 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 `
 
-func migrate() error {
-	db, err := sqlx.Open("postgres", os.Getenv("POSTGRES_URL"))
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	_, err = db.Exec(createTickets)
+func Migrate(db *sqlx.DB) error {
+	_, err := db.Exec(createTickets)
 
 	return err
 }

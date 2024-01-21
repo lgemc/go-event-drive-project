@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"net/http"
+	"tickets/app/api"
 	"time"
 
 	commonHTTP "github.com/ThreeDotsLabs/go-event-driven/common/http"
@@ -46,8 +47,9 @@ func handleTicket(ctx context.Context, ticket Ticket, bus *cqrs.EventBus) error 
 }
 
 type NewServerInput struct {
-	EventBus *cqrs.EventBus
-	Logger   watermill.LoggerAdapter
+	EventBus       *cqrs.EventBus
+	TicketsService api.TicketsService
+	Logger         watermill.LoggerAdapter
 }
 
 func NewServer(input NewServerInput) *echo.Echo {
@@ -77,6 +79,15 @@ func NewServer(input NewServerInput) *echo.Echo {
 		}
 
 		return c.NoContent(http.StatusOK)
+	})
+
+	e.GET("/tickets", func(c echo.Context) error {
+		tickets, err := input.TicketsService.GetAll(context.Background())
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "internal error")
+		}
+
+		return c.JSON(http.StatusOK, tickets)
 	})
 
 	return e
