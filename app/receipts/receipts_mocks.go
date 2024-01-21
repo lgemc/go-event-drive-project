@@ -1,4 +1,4 @@
-package app
+package receipts
 
 import (
 	"context"
@@ -11,17 +11,17 @@ type IssueReceiptResponse struct {
 	IssuedAt      time.Time `json:"issued_at"`
 }
 
-type ReceiptsService interface {
-	IssueReceipt(ctx context.Context, request Ticket) (IssueReceiptResponse, error)
+type Service interface {
+	IssueReceipt(ctx context.Context, request IssueReceiptRequest) (IssueReceiptResponse, error)
 }
 
-type ReceiptsServiceMock struct {
-	IssuedReceipts []Ticket
+type ServiceMock struct {
+	IssuedReceipts []IssueReceiptRequest
 
 	receiptLock sync.Mutex
 }
 
-func (mock *ReceiptsServiceMock) IssueReceipt(ctx context.Context, request Ticket) error {
+func (mock *ServiceMock) IssueReceipt(ctx context.Context, request IssueReceiptRequest) error {
 	defer mock.receiptLock.Unlock()
 
 	mock.receiptLock.Lock()

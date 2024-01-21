@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"tickets/app/api"
+	"tickets/app/receipts"
 	"tickets/app/repositories"
 
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients"
@@ -20,7 +21,7 @@ import (
 )
 
 type Dependencies struct {
-	ReceiptsClient     ReceiptsClientInterface
+	ReceiptsClient     receipts.ReceiptsClientInterface
 	SpreadsheetsClient SpreadsheetsClientInterface
 	Router             *message.Router
 	EventProcessor     *cqrs.EventProcessor
@@ -29,7 +30,7 @@ type Dependencies struct {
 }
 
 type BuildInput struct {
-	ReceiptsClient     ReceiptsClientInterface
+	ReceiptsClient     receipts.ReceiptsClientInterface
 	SpreadsheetsClient SpreadsheetsClientInterface
 	FilesClient        files.ClientWithResponsesInterface
 }
@@ -46,7 +47,7 @@ func (d *Dependencies) Build() error {
 		return err
 	}
 
-	receiptsClient := NewReceiptsClient(clients)
+	receiptsClient := receipts.NewReceiptsClient(clients)
 	spreadsheetsClient := NewSpreadsheetsClient(clients)
 
 	err = d.build(BuildInput{
@@ -62,7 +63,7 @@ func (d *Dependencies) Build() error {
 }
 
 func (d *Dependencies) BuildMock() error {
-	receiptsClient := ReceiptsServiceMock{}
+	receiptsClient := receipts.ServiceMock{}
 	spreadsheetsClient := SpreadsheetsClientMock{
 		Sheets: make(map[string][][]string),
 	}

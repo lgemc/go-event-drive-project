@@ -3,27 +3,24 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/ThreeDotsLabs/watermill/components/cqrs"
-	"net/http"
-	"tickets/app/api"
-	"time"
-
+	"fmt"
 	commonHTTP "github.com/ThreeDotsLabs/go-event-driven/common/http"
 	"github.com/ThreeDotsLabs/watermill"
+	"github.com/ThreeDotsLabs/watermill/components/cqrs"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"net/http"
+	"tickets/app/api"
 )
 
 type TicketsRequest struct {
 	Tickets []Ticket `json:"tickets"`
 }
 
-func handleTicket(ctx context.Context, ticket Ticket, bus *cqrs.EventBus) error {
+func handleTicket(ctx context.Context, ticket Ticket, idempotencyKey string, bus *cqrs.EventBus) error {
 	event := TicketEvent{
 		Ticket: &ticket,
-		Header: EventHeader{
-			ID:          watermill.NewUUID(),
-			PublishedAt: time.Now().Format(time.RFC3339Nano),
-		},
+		Header: NewEventHandlerWithIdempotencyKey(idempotencyKey),
 	}
 
 	switch ticket.Status {
@@ -71,8 +68,13 @@ func NewServer(input NewServerInput) *echo.Echo {
 			correlationId = watermill.NewUUID()
 		}
 
+		idempotencyKey := c.Request().Header.Get("Idempotency-Key")
+		if idempotencyKey == "" {
+			idempotencyKey = fmt.Sprintf("gen_%s", uuid.NewString())
+		}
+
 		for _, ticket := range request.Tickets {
-			err := handleTicket(context.Background(), ticket, input.EventBus)
+			err := handleTicket(context.Background(), ticket, idempotencyKey, input.EventBus)
 			if err != nil {
 				return c.String(http.StatusBadRequest, err.Error())
 			}

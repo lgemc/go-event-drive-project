@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients/files"
 	"strconv"
+	"tickets/app/receipts"
 
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"tickets/app/repositories"
 )
 
 type injectHandlersInput struct {
-	receiptsClient     ReceiptsClientInterface
+	receiptsClient     receipts.ReceiptsClientInterface
 	ticketsRepo        repositories.TicketsRepository
 	spreadsheetsClient SpreadsheetsClientInterface
 	filesClient        files.ClientWithResponsesInterface
@@ -24,7 +25,16 @@ func injectHandlers(input injectHandlersInput, ep *cqrs.EventProcessor) error {
 	spreadsheetsClient := input.spreadsheetsClient
 
 	issuesReceipt := cqrs.NewEventHandler[TicketBookingConfirmed]("issues-receipt", func(ctx context.Context, event *TicketBookingConfirmed) error {
-		return receiptsClient.IssueReceipt(ctx, *event.Ticket)
+		return receiptsClient.IssueReceipt(ctx, receipts.IssueReceiptRequest{
+			TicketID:      event.TicketID,
+			Status:        event.Status.String(),
+			CustomerEmail: event.CustomerEmail,
+			Price: receipts.Price{
+				Amount:   event.Price.Amount,
+				Currency: event.Price.Currency,
+			},
+			IdempotencyKey: event.Header.IdempotencyKey,
+		})
 	})
 
 	storeConfirmed := cqrs.NewEventHandler[TicketBookingConfirmed]("store-confirmed", func(ctx context.Context, event *TicketBookingConfirmed) error {
