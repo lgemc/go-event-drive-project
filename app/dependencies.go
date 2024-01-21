@@ -151,6 +151,7 @@ func (d *Dependencies) build(input BuildInput) error {
 		ticketsRepo:        ticketsRepo,
 		spreadsheetsClient: spreadsheetsClient,
 		filesClient:        input.FilesClient,
+		eventBus:           bus,
 	}, ep)
 	if err != nil {
 		return err
