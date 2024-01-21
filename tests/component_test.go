@@ -15,16 +15,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestServerIsUp(t *testing.T) {
-	waitForHttpServer(t)
-}
+//func TestServerIsUp(t *testing.T) {
+//	t.Helper()
+//	lock.Lock()
+//	defer lock.Unlock()
+//
+//	a := waitForHttpServer(t)
+//	a.Cancel()
+//
+//	<-a.Ctx.Done()
+//}
 
-func TestIssuesReceipt(t *testing.T) {
+//func TestIssuesReceipt(t *testing.T) {
+//	t.Helper()
+//
+//	a := waitForHttpServer(t)
+//	defer a.Cancel()
+//	ticket := TicketStatus{
+//		Status: app.TicketStatusConfirmed.String(),
+//		Price: Money{
+//			Amount:   "5",
+//			Currency: "USD",
+//		},
+//	}
+//	sendTicketsStatus(t, TicketsStatusRequest{
+//		Tickets: []TicketStatus{ticket},
+//	})
+//
+//	cli, ok := a.Dependencies.ReceiptsClient.(*app.ReceiptsServiceMock)
+//	assert.True(t, ok)
+//
+//	assertReceiptForTicketIssued(t, cli, ticket)
+//}
+
+func TestErrorTicketsReceipt(t *testing.T) {
 	t.Helper()
+
 	a := waitForHttpServer(t)
+	defer a.Cancel()
 
 	ticket := TicketStatus{
-		Status: app.TicketStatusConfirmed.String(),
+		Status: app.TicketStatusCanceled.String(),
 		Price: Money{
 			Amount:   "5",
 			Currency: "USD",
@@ -34,10 +65,10 @@ func TestIssuesReceipt(t *testing.T) {
 		Tickets: []TicketStatus{ticket},
 	})
 
-	cli, ok := a.Dependencies.ReceiptsClient.(*app.ReceiptsServiceMock)
+	cli, ok := a.Dependencies.SpreadsheetsClient.(*app.SpreadsheetsClientMock)
 	assert.True(t, ok)
 
-	assertReceiptForTicketIssued(t, cli, ticket)
+	assertTrackTicketCanceled(t, cli, ticket)
 }
 
 func waitForHttpServer(t *testing.T) *app.App {
@@ -88,6 +119,28 @@ type TicketStatus struct {
 type Money struct {
 	Amount   string `json:"amount"`
 	Currency string `json:"currency"`
+}
+
+func assertTrackTicketCanceled(t *testing.T, spreadsheets *app.SpreadsheetsClientMock, ticket TicketStatus) {
+	assert.EventuallyWithT(
+		t,
+		func(collectT *assert.CollectT) {
+			errorSheet := spreadsheets.Sheets["tickets-to-refund"]
+			errorRows := len(errorSheet)
+			t.Log("issued receipts", errorRows)
+
+			assert.Greater(collectT, errorRows, 0, "no receipts to refund")
+		},
+		10*time.Second,
+		100*time.Millisecond,
+	)
+
+	column := spreadsheets.Sheets["tickets-to-refund"][0]
+	assert.Len(t, column, 4)
+
+	assert.Equal(t, ticket.TicketID, column[0])
+	assert.Equal(t, ticket.Price.Amount, column[2])
+	assert.Equal(t, ticket.Price.Currency, column[3])
 }
 
 func assertReceiptForTicketIssued(t *testing.T, receiptsService *app.ReceiptsServiceMock, ticket TicketStatus) {

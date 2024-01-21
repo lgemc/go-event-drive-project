@@ -9,12 +9,16 @@ import (
 	"github.com/ThreeDotsLabs/go-event-driven/common/clients/spreadsheets"
 )
 
+type SpreadsheetsClientInterface interface {
+	AppendRow(ctx context.Context, spreadsheetName string, row []string) error
+}
+
 type SpreadsheetsClient struct {
 	clients *clients.Clients
 }
 
-func NewSpreadsheetsClient(clients *clients.Clients) SpreadsheetsClient {
-	return SpreadsheetsClient{
+func NewSpreadsheetsClient(clients *clients.Clients) SpreadsheetsClientInterface {
+	return &SpreadsheetsClient{
 		clients: clients,
 	}
 }

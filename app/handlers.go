@@ -13,7 +13,7 @@ type InjectHandlersInput struct {
 	IssuesReceiptSub   *redisstream.Subscriber
 	AppendToTrackerSub *redisstream.Subscriber
 	ReceiptsClient     ReceiptsClientInterface
-	SpreadsheetsClient *SpreadsheetsClient
+	SpreadsheetsClient SpreadsheetsClientInterface
 }
 
 func InjectHandlers(input InjectHandlersInput) {

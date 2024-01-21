@@ -12,8 +12,8 @@ import (
 type App struct {
 	Dependencies *Dependencies
 	ErrGroup     *errgroup.Group
-	ctx          context.Context
-	cancel       context.CancelFunc
+	Ctx          context.Context
+	Cancel       context.CancelFunc
 }
 
 func NewApp(ctx context.Context) *App {
@@ -23,8 +23,8 @@ func NewApp(ctx context.Context) *App {
 
 	return &App{
 		ErrGroup: errgrp,
-		ctx:      ctx,
-		cancel:   cancel,
+		Ctx:      ctx,
+		Cancel:   cancel,
 	}
 }
 
@@ -55,9 +55,9 @@ func (a *App) Init() error {
 }
 
 func (a *App) Run() {
-	defer a.cancel()
+	defer a.Cancel()
 
-	ctx := a.ctx
+	ctx := a.Ctx
 
 	errgrp := a.ErrGroup
 

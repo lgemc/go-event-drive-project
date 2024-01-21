@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"net/http"
 	"os"
 
@@ -15,14 +16,15 @@ import (
 )
 
 type Dependencies struct {
-	ReceiptsClient ReceiptsClientInterface
-	Router         *message.Router
-	Server         *echo.Echo
+	ReceiptsClient     ReceiptsClientInterface
+	SpreadsheetsClient SpreadsheetsClientInterface
+	Router             *message.Router
+	Server             *echo.Echo
 }
 
 type BuildInput struct {
-	ReceiptsClient ReceiptsClientInterface
-	Clients        *clients.Clients
+	ReceiptsClient     ReceiptsClientInterface
+	SpreadsheetsClient SpreadsheetsClientInterface
 }
 
 func (d *Dependencies) Build() error {
@@ -38,38 +40,29 @@ func (d *Dependencies) Build() error {
 	}
 
 	receiptsClient := NewReceiptsClient(clients)
+	spreadsheetsClient := NewSpreadsheetsClient(clients)
 
 	return d.build(BuildInput{
-		Clients:        clients,
-		ReceiptsClient: receiptsClient,
+		ReceiptsClient:     receiptsClient,
+		SpreadsheetsClient: spreadsheetsClient,
 	})
 }
 
 func (d *Dependencies) BuildMock() error {
-	clients, err := clients.NewClients(
-		os.Getenv("GATEWAY_ADDR"),
-		func(ctx context.Context, req *http.Request) error {
-			req.Header.Set("Correlation-ID", log.CorrelationIDFromContext(ctx))
-
-			return nil
-		})
-	if err != nil {
-		return err
+	receiptsClient := ReceiptsServiceMock{}
+	spreadsheetsClient := SpreadsheetsClientMock{
+		Sheets: make(map[string][][]string),
 	}
 
-	receiptsClient := ReceiptsServiceMock{}
-
 	return d.build(BuildInput{
-		Clients:        clients,
-		ReceiptsClient: &receiptsClient,
+		ReceiptsClient:     &receiptsClient,
+		SpreadsheetsClient: &spreadsheetsClient,
 	})
 }
 
 func (d *Dependencies) build(input BuildInput) error {
-	clients := input.Clients
 	receiptsClient := input.ReceiptsClient
-
-	spreadsheetsClient := NewSpreadsheetsClient(clients)
+	spreadsheetsClient := input.SpreadsheetsClient
 
 	watermillLogger := log.NewWatermill(logrus.NewEntry(logrus.StandardLogger()))
 
@@ -83,6 +76,8 @@ func (d *Dependencies) build(input BuildInput) error {
 	if err != nil {
 		return err
 	}
+
+	bus, err := cqrs.NewEventBusWithConfig()
 
 	issueReceiptSub, err := redisstream.NewSubscriber(redisstream.SubscriberConfig{
 		Client:        rdb,
@@ -122,12 +117,13 @@ func (d *Dependencies) build(input BuildInput) error {
 		IssuesReceiptSub:   issueReceiptSub,
 		AppendToTrackerSub: appendToTrackerSub,
 		ReceiptsClient:     receiptsClient,
-		SpreadsheetsClient: &spreadsheetsClient,
+		SpreadsheetsClient: spreadsheetsClient,
 	})
 
 	d.Router = router
 	d.Server = server
 	d.ReceiptsClient = receiptsClient
+	d.SpreadsheetsClient = spreadsheetsClient
 
 	return nil
 }
