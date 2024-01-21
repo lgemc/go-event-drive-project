@@ -156,6 +156,10 @@ func (d *Dependencies) build(input BuildInput) error {
 		})
 	})
 
+	deleteCanceled := cqrs.NewEventHandler[TicketCanceledEvent]("remove-canceled", func(ctx context.Context, event *TicketCanceledEvent) error {
+		return ticketsRepo.Delete(ctx, event.TicketID)
+	})
+
 	printTicket := cqrs.NewEventHandler[TicketBookingConfirmed]("print-ticket", func(ctx context.Context, event *TicketBookingConfirmed) error {
 		ticket := event.Ticket
 
@@ -183,6 +187,7 @@ func (d *Dependencies) build(input BuildInput) error {
 		issuesReceipt,
 		printTicket,
 		appendCanceledTicket,
+		deleteCanceled,
 	)
 
 	d.Router = router

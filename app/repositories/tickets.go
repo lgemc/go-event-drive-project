@@ -20,6 +20,7 @@ type Ticket struct {
 
 type TicketsRepository interface {
 	Put(ctx context.Context, ticket Ticket) error
+	Delete(ctx context.Context, ticketID string) error
 }
 
 func NewTicketsRepository(db *sqlx.DB) TicketsRepository {
@@ -37,6 +38,12 @@ func (r *ticketsRepository) Put(ctx context.Context, ticket Ticket) error {
 INSERT INTO tickets 
     (ticket_id, price_amount, price_currency, customer_email)
 VALUES  (:ticket_id, :price_amount, :price_currency, :customer_email)`, ticket)
+
+	return err
+}
+
+func (r *ticketsRepository) Delete(ctx context.Context, ticketID string) error {
+	_, err := r.db.Exec("DELETE FROM tickets where ticket_id = $1", ticketID)
 
 	return err
 }
